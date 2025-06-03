@@ -1,0 +1,35 @@
+// =============================================================================
+// BootConfig.json - Boot Configuration File
+// =============================================================================
+/*
+{
+  "system": {
+    "device_id": "ESP8266_DHT_001",
+    "firmware_version": "2.0.0",
+    "debug_level": 2,
+    "watchdog_timeout": 30000,
+    "restart_on_failure": true
+  },
+  "wifi": {
+    "ssid": "KRC-101C",
+    "password": "krc101c@",
+    "connection_timeout": 30000,
+    "retry_attempts": 3,
+    "power_save_mode": false
+  },
+  "sensor": {
+    "type": "DHT11",
+    "pin": 2,
+    "read_interval": 3000,
+    "validation_attempts": 3,
+    "spike_threshold_temp": 5.0,
+    "spike_threshold_humidity": 10.0
+  },
+  "location": {
+    "latitude": 28.637270,
+    "longitude": 77.170277,
+    "timezone_offset": 19800,
+    "location_name": "Delhi, India"
+  }
+}
+*/
