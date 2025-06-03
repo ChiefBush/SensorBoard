@@ -7,92 +7,95 @@
 #include <WiFiUdp.h>
 
 // WiFi credentials 
-const char* ssid = "KRC";
-const char* password = "pinkzebra1";
+const char* ssid = "KRC-101C";
+const char* password = "krc101c@";
 
-// Server configuration - Try with trailing slash
-const char* serverURL = "https://lostdevs.io/uploader.php/";
+// Server configuration
+const char* serverURL = "https://lostdevs.io/ctrl1/master.php";
 const char* secretKey = "lostdev-sensor1-1008200303082003";
 
-// DHT sensor configuration 
+// DHT sensor configuration a
 #define DHT_PIN 2        // GPIO2 (D4 on NodeMCU)
 #define DHT_TYPE DHT11   
 // #define DHT_TYPE DHT22   
 
 DHT dht(DHT_PIN, DHT_TYPE);
 
-// Alternative pins 
-// #define DHT_PIN 4     // GPIO4 (D2 on NodeMCU)  
-// #define DHT_PIN 5     // GPIO5 (D1 on NodeMCU)
-// #define DHT_PIN 14    // GPIO14 (D5 on NodeMCU)
-
-// NTP Client for timestamp
+// NTP Client
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "pool.ntp.org", 0, 60000); // UTC time, update every minute
+NTPClient timeClient(ntpUDP, "pool.ntp.org", 19800, 60000); // IST offset: 5.5 hours = 19800 seconds
 
-// Sensor configuration
-const int SENSOR_ID = 1001;  // Unique sensor identifier (4-digit integer)
-const float LATITUDE = 28.6139;     //  latitude
-const float LONGITUDE = 77.2090;    //  longitude
+// BootConfig.h
+const int SENSOR_ID = 1;
 
-// Timing configuration
-unsigned long lastReading = 0;
-const unsigned long readingInterval = 500; // 0.5 seconds between readings
+const float LATITUDE = 28.637270;   
+const float LONGITUDE = 77.170277;  
+
+// sensor reading and data transmission
+unsigned long lastSensorReading = 0;
+unsigned long lastDataTransmission = 0;
+const unsigned long sensorReadInterval = 3000;    // Read DHT11 every 3 seconds (respects 2.5s minimum)
+const unsigned long transmissionInterval = 500;  // Send data every 0.5 seconds (120 packets/minute)
+
+
+// Cached sensor data structure
+struct SensorData {
+  float temperature;
+  float humidity;
+  bool isValid;
+  unsigned long lastReadTime;
+  int readingAge; // How many transmissions have used this reading
+} cachedData = {-999.0, -999.0, false, 0, 0};
 
 // Error tracking
 int wifiFailures = 0;
 int sensorFailures = 0;
 int httpFailures = 0;
 unsigned long lastSuccessfulReading = 0;
+unsigned long totalTransmissions = 0; // Track total packets sent
 
 WiFiClient wifiClient;
 HTTPClient http;
 
 void setup() {
   Serial.begin(115200);
-  delay(2000); // Increased delay for serial monitor
+  delay(2000);
   
-  Serial.println("\n\n=== ESP8266 DHT22 Data Logger Starting ===");
+  Serial.println("\n\n=== ESP8266 HIGH-FREQUENCY DHT Data Logger Starting ===");
   Serial.print("Chip ID: ");
   Serial.println(ESP.getChipId(), HEX);
-  Serial.print("Flash Chip ID: ");
-  Serial.println(ESP.getFlashChipId(), HEX);
   Serial.print("Free Heap: ");
   Serial.println(ESP.getFreeHeap());
-  Serial.print("Core Version: ");
-  Serial.println(ESP.getCoreVersion());
-  Serial.println("Configured for: https://lostdevs.io/uploader.php");
-  Serial.println("==========================================\n");
-  
+  Serial.println("Target URL: https://lostdevs.io/ctrl1/master.php");
+  Serial.printf("Sensor read interval: %lu ms\n", sensorReadInterval);
+  Serial.printf("Transmission interval: %lu ms\n", transmissionInterval);
+  Serial.printf("Expected packets per minute: %.1f\n", 60000.0 / transmissionInterval);
+  Serial.println("=============================================\n");
   
   Serial.println("Initializing DHT sensor...");
-  
   dht.begin();
-  delay(3000); // DHT11 needs longer stabilization time
+  delay(3000);
   
-  // Test DHT sensor before WiFi connection with multiple attempts
+  // Test DHT sensor
   Serial.println("Testing DHT sensor...");
   bool sensorWorking = false;
   
   for (int i = 0; i < 5; i++) {
-    #if DHT_TYPE == DHT11
-      delay(2500); // DHT11 needs at least 2 seconds between readings
-    #else  
-      delay(2000); // DHT22 needs 2 seconds between readings
-    #endif
-    
+    delay(2500); // DHT11 needs at least 2 seconds between readings
     float testTemp = dht.readTemperature();
     float testHumid = dht.readHumidity();
     
-    Serial.printf("Attempt %d: Temp=%.1f, Humidity=%.1f\n", i+1, testTemp, testHumid);
+    Serial.printf("Test %d: Temp=%.1f°C, Humidity=%.1f%%\n", i+1, testTemp, testHumid);
     
     if (!isnan(testTemp) && !isnan(testHumid)) {
-      #if DHT_TYPE == DHT11
-        Serial.printf("DHT11 working - Temp: %.0f°C, Humidity: %.0f%%\n", testTemp, testHumid);
-      #else
-        Serial.printf("DHT22 working - Temp: %.1f°C, Humidity: %.1f%%\n", testTemp, testHumid);
-      #endif
+      Serial.printf("DHT11 working - Temp: %.0f°C, Humidity: %.0f%%\n", testTemp, testHumid);
       sensorWorking = true;
+      // ADDED: Initialize cached data with first valid reading
+      cachedData.temperature = testTemp;
+      cachedData.humidity = testHumid;
+      cachedData.isValid = true;
+      cachedData.lastReadTime = millis();
+      cachedData.readingAge = 0;
       break;
     }
   }
@@ -104,17 +107,16 @@ void setup() {
   // Connect to WiFi
   connectToWiFi();
   
-  // Initialize NTP client
-  Serial.println("Initializing NTP client...");
+  // Initialize NTP client for India Standard Time
+  Serial.println("Initializing NTP client for India Standard Time (IST)...");
   timeClient.begin();
-  timeClient.setTimeOffset(0); // UTC time
+  timeClient.setTimeOffset(19800); // IST = UTC + 5:30 hours = 19800 seconds
   
-  // Force first NTP update with better error handling
   Serial.println("Getting initial time from NTP server...");
   int ntpAttempts = 0;
   bool ntpSuccess = false;
   
-  while (ntpAttempts < 20) { // Increased attempts
+  while (ntpAttempts < 20) {
     if (timeClient.update()) {
       ntpSuccess = true;
       break;
@@ -123,224 +125,165 @@ void setup() {
     delay(1000);
     ntpAttempts++;
     
-    // Try different NTP servers if first fails
     if (ntpAttempts == 10) {
-      Serial.println("\nTrying alternative NTP server...");
-      timeClient.setPoolServerName("time.google.com");
+      Serial.println("\nTrying Indian NTP server...");
+      timeClient.setPoolServerName("in.pool.ntp.org"); // Use India NTP pool
     }
   }
   
   if (ntpSuccess) {
-    Serial.println("NTP time synchronized");
-    Serial.print("Current time: ");
+    Serial.println("NTP time synchronized to India Standard Time (IST)");
+    Serial.print("Current IST time: ");
     Serial.println(getISOTimestamp());
   } else {
     Serial.println("Warning: Could not sync with NTP server");
-    Serial.println("Will use system time (may be inaccurate)");
   }
   
   Serial.println("\nSetup completed successfully!");
-  Serial.println("Starting data collection...\n");
+  Serial.println("Starting high-frequency data collection...\n");
 }
 
 void loop() {
-  // Check if it's time to take a reading
-  if (millis() - lastReading >= readingInterval) {
-    
-    unsigned long readStartTime = millis();
-    
-    // Ensure WiFi is connected
-    if (WiFi.status() != WL_CONNECTED) {
-      Serial.println("WiFi disconnected. Reconnecting...");
-      wifiFailures++;
-      connectToWiFi();
-    }
-    
-    // Update time from NTP server (only every 60 seconds to avoid overload)
-    static unsigned long lastNtpUpdate = 0;
-    if (millis() - lastNtpUpdate > 60000) {
-      timeClient.update();
-      lastNtpUpdate = millis();
-    }
-    
-    // Read sensor data with appropriate timing for sensor type
-    #if DHT_TYPE == DHT11
-      static unsigned long lastDHTRead = 0;
-      // DHT11 needs minimum 2 seconds between readings
-      if (millis() - lastDHTRead < 2500) {
-        lastReading = millis();
-        return; // Skip this reading
-      }
-      lastDHTRead = millis();
-    #endif
-    
-    float temperature = dht.readTemperature();
-    float humidity = dht.readHumidity();
-    
-    unsigned long readEndTime = millis();
-    unsigned long readDuration = readEndTime - readStartTime;
-    
-    // Get current timestamp in ISO format
-    String timestamp = getISOTimestamp();
-    
-    // Check if readings are valid
-    bool sensorError = false;
-    if (isnan(temperature) || isnan(humidity)) {
-      Serial.println("Failed to read from DHT sensor!");
-      sensorFailures++;
-      sensorError = true;
-      // Still send data with error flags
-      temperature = -999.0; // Error value
-      humidity = -999.0;    // Error value
-    } else {
-      lastSuccessfulReading = millis();
-    }
-    
-    // Create FORM payload (FIXED - changed from JSON to form data)
-    String formPayload = createFormPayload(temperature, humidity, timestamp, readDuration, sensorError);
-    
-    // Send data to server
-    bool httpSuccess = sendDataToServer(formPayload);
-    if (!httpSuccess) {
-      httpFailures++;
-    }
-    
-    // Update last reading time
-    lastReading = millis();
-    
-    // Print data to serial for debugging
-    Serial.println("Data sent:");
-    Serial.println(formPayload);
-    Serial.printf("Read time: %lu ms\n", readDuration);
-    Serial.println("---");
+  unsigned long currentTime = millis();
+  
+  // STEP 1: Check if it's time to read the sensor (every 3 seconds)
+  if (currentTime - lastSensorReading >= sensorReadInterval) {
+    readSensorData();
+    lastSensorReading = currentTime;
   }
   
-  delay(10); // Small delay to prevent excessive CPU usage
+  // STEP 2: Check if it's time to transmit data (every 5 seconds, or whatever you set)
+  if (currentTime - lastDataTransmission >= transmissionInterval) {
+    transmitCachedData();
+    lastDataTransmission = currentTime;
+  }
+  
+  delay(50); // Small delay to prevent excessive CPU usage
+}
+
+// ADDED: Function to read sensor data and update cache
+void readSensorData() {
+  unsigned long readStartTime = millis();
+  
+  // Ensure WiFi is connected
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi disconnected. Reconnecting...");
+    wifiFailures++;
+    connectToWiFi();
+  }
+  
+  // Update time from NTP server periodically
+  static unsigned long lastNtpUpdate = 0;
+  if (millis() - lastNtpUpdate > 60000) {
+    timeClient.update();
+    lastNtpUpdate = millis();
+  }
+  
+  float temperature = dht.readTemperature();
+  float humidity = dht.readHumidity();
+  
+  unsigned long readEndTime = millis();
+  unsigned long readDuration = readEndTime - readStartTime;
+  
+  // Check if readings are valid
+  if (isnan(temperature) || isnan(humidity)) {
+    Serial.println("⚠️  Failed to read from DHT sensor! Using cached data.");
+    sensorFailures++;
+    // Don't update cache - keep using last valid reading
+  } else {
+    // Update cache with new valid reading
+    cachedData.temperature = temperature;
+    cachedData.humidity = humidity;
+    cachedData.isValid = true;
+    cachedData.lastReadTime = millis();
+    cachedData.readingAge = 0; // Reset age counter
+    lastSuccessfulReading = millis();
+    
+    Serial.printf("📊 NEW SENSOR DATA: Temp=%.1f°C, Humidity=%.1f%% (read in %lums)\n", 
+                  temperature, humidity, readDuration);
+  }
+}
+
+// ADDED: Function to transmit cached data
+void transmitCachedData() {
+  if (!cachedData.isValid) {
+    Serial.println("❌ No valid cached data to transmit!");
+    return;
+  }
+  
+  totalTransmissions++;
+  cachedData.readingAge++;
+  
+  unsigned long dataAge = millis() - cachedData.lastReadTime;
+  String timestamp = getISOTimestamp();
+  
+  // Create payload with cached data
+  String formPayload = createFormPayload(
+    cachedData.temperature, 
+    cachedData.humidity, 
+    timestamp, 
+    dataAge, 
+    false, // Not a sensor error since we have valid cached data
+    cachedData.readingAge
+  );
+  
+  // Send data to server
+  bool httpSuccess = sendDataToServer(formPayload);
+  if (!httpSuccess) {
+    httpFailures++;
+  }
+  
+  // Enhanced debug output
+  Serial.println("=== DATA TRANSMISSION ===");
+  Serial.printf("📤 Packet #%lu sent\n", totalTransmissions);
+  Serial.printf("📊 Data: Temp=%.1f°C, Humidity=%.1f%%\n", cachedData.temperature, cachedData.humidity);
+  Serial.printf("⏱️  Data age: %lu ms (reading #%d)\n", dataAge, cachedData.readingAge);
+  Serial.printf("📈 Transmission rate: %.1f packets/min\n", totalTransmissions * 60000.0 / millis());
+  Serial.printf("✅ Status: %s\n", httpSuccess ? "SUCCESS" : "FAILED");
+  Serial.println("========================\n");
 }
 
 void connectToWiFi() {
-  // Print WiFi debugging info
-  Serial.println("\n=== WiFi Debug Info ===");
-  Serial.print("Attempting to connect to SSID: ");
+  Serial.println("\n=== WiFi Connection ===");
+  Serial.print("Connecting to: ");
   Serial.println(ssid);
-  Serial.print("Password length: ");
-  Serial.println(strlen(password));
-  Serial.print("WiFi Mode: ");
-  Serial.println(WiFi.getMode());
   
-  // Disconnect any previous connection
   WiFi.disconnect();
   delay(1000);
-  
-  // Set WiFi mode to station
   WiFi.mode(WIFI_STA);
   delay(1000);
   
-  // Scan for available networks
-  Serial.println("Scanning for WiFi networks...");
-  int n = WiFi.scanNetworks();
-  if (n == 0) {
-    Serial.println("No networks found!");
-  } else {
-    Serial.printf("Found %d networks:\n", n);
-    for (int i = 0; i < n; ++i) {
-      Serial.printf("%d: %s (%d dBm) %s\n", 
-        i + 1, 
-        WiFi.SSID(i).c_str(), 
-        WiFi.RSSI(i),
-        (WiFi.encryptionType(i) == ENC_TYPE_NONE) ? "Open" : "Encrypted"
-      );
-      
-      // Check if our target SSID is found
-      if (WiFi.SSID(i) == ssid) {
-        Serial.println(">>> Target network found! <<<");
-      }
-    }
-  }
-  Serial.println("========================\n");
-  
-  // Begin connection
   WiFi.begin(ssid, password);
-  Serial.print("Connecting to WiFi");
+  Serial.print("Connecting");
   
   int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 60) { // Increased to 60 attempts
-    delay(500);
+  while (WiFi.status() != WL_CONNECTED && attempts < 30) {
+    delay(1000);
     Serial.print(".");
     attempts++;
-    
-    // Print status every 10 attempts
-    if (attempts % 10 == 0) {
-      Serial.println();
-      Serial.print("Status: ");
-      printWiFiStatus();
-      Serial.print("Attempt ");
-      Serial.print(attempts);
-      Serial.print("/60: ");
-    }
   }
   
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println();
-    Serial.println("WiFi Connected Successfully!");
+    Serial.println("WiFi Connected!");
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
-    Serial.print("Gateway: ");
-    Serial.println(WiFi.gatewayIP());
-    Serial.print("Subnet: ");
-    Serial.println(WiFi.subnetMask());
-    Serial.print("DNS: ");
-    Serial.println(WiFi.dnsIP());
     Serial.print("Signal strength: ");
     Serial.print(WiFi.RSSI());
     Serial.println(" dBm");
   } else {
     Serial.println();
-    Serial.println("Failed to connect to WiFi!");
-    Serial.print("Final status: ");
-    printWiFiStatus();
-    Serial.println("Waiting 10 seconds before restart...");
+    Serial.println("WiFi connection FAILED!");
+    Serial.println("Restarting in 10 seconds...");
     delay(10000);
     ESP.restart();
   }
-}
-
-void printWiFiStatus() {
-  switch(WiFi.status()) {
-    case WL_IDLE_STATUS:
-      Serial.println("WL_IDLE_STATUS - WiFi is in process of changing between statuses");
-      break;
-    case WL_NO_SSID_AVAIL:
-      Serial.println("WL_NO_SSID_AVAIL - SSID cannot be reached");
-      break;
-    case WL_SCAN_COMPLETED:
-      Serial.println("WL_SCAN_COMPLETED - Scan networks is completed");
-      break;
-    case WL_CONNECTED:
-      Serial.println("WL_CONNECTED - Connected to WiFi");
-      break;
-    case WL_CONNECT_FAILED:
-      Serial.println("WL_CONNECT_FAILED - Connection failed");
-      break;
-    case WL_CONNECTION_LOST:
-      Serial.println("WL_CONNECTION_LOST - Connection lost");
-      break;
-    case WL_DISCONNECTED:
-      Serial.println("WL_DISCONNECTED - Disconnected from network");
-      break;
-    case WL_NO_SHIELD:
-      Serial.println("WL_NO_SHIELD - No WiFi shield is present");
-      break;
-    default:
-      Serial.println("Unknown WiFi status");
-      break;
-  }
+  Serial.println("=====================\n");
 }
 
 String getISOTimestamp() {
   unsigned long epochTime = timeClient.getEpochTime();
   
-  // Convert epoch time to ISO 8601 format
   int year, month, day, hour, minute, second;
   
   second = epochTime % 60;
@@ -350,7 +293,6 @@ String getISOTimestamp() {
   hour = epochTime % 24;
   epochTime /= 24;
   
-  // Calculate date from days since epoch (1970-01-01)
   long days = epochTime;
   year = 1970;
   
@@ -368,7 +310,6 @@ String getISOTimestamp() {
     }
   }
   
-  // Month calculation
   int daysInMonth[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
   if (isLeapYear(year)) {
     daysInMonth[1] = 29;
@@ -381,7 +322,6 @@ String getISOTimestamp() {
   }
   day = days + 1;
   
-  // Format as ISO 8601 string
   char isoTime[25];
   sprintf(isoTime, "%04d-%02d-%02dT%02d:%02d:%02dZ", year, month, day, hour, minute, second);
   
@@ -392,115 +332,176 @@ bool isLeapYear(int year) {
   return (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
 }
 
-// FIXED FUNCTION - Changed from JSON to form data to match server expectations
-String createFormPayload(float temp, float humid, String timestamp, unsigned long readTime, bool sensorError) {
+// MODIFIED: Enhanced payload creation with caching metadata
+String createFormPayload(float temp, float humid, String timestamp, unsigned long dataAge, bool sensorError, int readingAge) {
   String payload = "";
   
-  // Add secret key for authentication (FIXED: parameter name is "secret", not "secret_key")
+  // Authentication 
   payload += "secret=" + String(secretKey);
   
-  // FIXED: Use correct parameter name "sensor_unique_id" instead of "sensor_id"
+  // Sensor ID 
   payload += "&sensor_unique_id=" + String(SENSOR_ID);
   
-  // Temperature and humidity (server expects these exact names)
+  // Temperature in Kelvin 
+  float tempKelvin;
   if (sensorError) {
-    payload += "&temperature=-999";
-    payload += "&humidity=-999";
+    tempKelvin = -999.0;
   } else {
-    #if DHT_TYPE == DHT11
-      payload += "&temperature=" + String((int)round(temp));
-      payload += "&humidity=" + String((int)round(humid));
-    #else
-      payload += "&temperature=" + String(temp, 1);
-      payload += "&humidity=" + String(humid, 1);
-    #endif
+    tempKelvin = temp + 273.15;
+  }
+  payload += "&Temperature(K)=" + String(tempKelvin, 2); // 2 decimal places 
+  
+  // Humidity 
+  if (sensorError) {
+    payload += "&humidity(%)=-999";
+  } else {
+    payload += "&humidity(%)=" + String((int)round(humid)); // Integer 
   }
   
-  // FIXED: Location data parameter names are "sensor_latitude" and "sensor_longitude"
-  payload += "&sensor_latitude=" + String(LATITUDE, 6);
+  // Coordinates 
   payload += "&sensor_longitude=" + String(LONGITUDE, 6);
+  payload += "&sensor_latitude=" + String(LATITUDE, 6);
   
-  // FIXED: Timestamp parameter name is "receiving_date", not "timestamp"
+  // Timestamp 
   payload += "&receiving_date=" + timestamp;
   
-  // Optional: Add diagnostic data as additional parameters
-  payload += "&read_time_ms=" + String(readTime);
-  payload += "&wifi_rssi=" + String(WiFi.RSSI());
-  payload += "&free_heap=" + String(ESP.getFreeHeap());
-  payload += "&uptime_ms=" + String(millis());
-  payload += "&sensor_error=" + String(sensorError ? "1" : "0");
-  payload += "&wifi_failures=" + String(wifiFailures);
-  payload += "&sensor_failures=" + String(sensorFailures);
-  payload += "&http_failures=" + String(httpFailures);
+  // RDF metadata 
+  payload += "&rdf_metadata=sensor_type:DHT11,location:indoor,purpose:environmental_monitoring,transmission_mode:cached_high_frequency";
+  
+  // ENHANCED: Download metadata with caching info
+  payload += "&download_metadata=chip_id:" + String(ESP.getChipId(), HEX) + 
+             ",data_age_ms:" + String(dataAge) + 
+             ",reading_age:" + String(readingAge) + 
+             ",total_transmissions:" + String(totalTransmissions) +
+             ",wifi_failures:" + String(wifiFailures) + 
+             ",sensor_failures:" + String(sensorFailures) + 
+             ",http_failures:" + String(httpFailures);
+  
+  // Expected noise - lower for cached data since it's the same reading
+  if (sensorError) {
+    payload += "&expected_noise=high";
+  } else if (readingAge > 1) {
+    payload += "&expected_noise=low"; // Cached data has no sensor noise
+  } else {
+    payload += "&expected_noise=medium"; // Fresh DHT11 reading
+  }
+  
+  // Spike detection - only relevant for fresh readings
+  static float lastTemp = -999;
+  static float lastHumid = -999;
+  String spikeStatus = "none";
+  
+  if (!sensorError && readingAge == 1) { // Only check spikes on fresh readings
+    if (lastTemp != -999 && lastHumid != -999) {
+      float tempDiff = abs(temp - lastTemp);
+      float humidDiff = abs(humid - lastHumid);
+      
+      if (tempDiff > 5.0 || humidDiff > 10.0) {
+        spikeStatus = "detected";
+      }
+    }
+    lastTemp = temp;
+    lastHumid = humid;
+  } else if (readingAge > 1) {
+    spikeStatus = "cached"; // Indicate this is cached data
+  }
+  
+  payload += "&spike=" + spikeStatus;
   
   return payload;
 }
 
-// FIXED FUNCTION - Changed to send form data instead of JSON
+// HTTP client with better error handling
 bool sendDataToServer(String payload) {
-  if (WiFi.status() == WL_CONNECTED) {
-    http.begin(wifiClient, serverURL);
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi not connected. Cannot send data.");
+    return false;
+  }
+  
+  // WiFiClientSecure 
+  WiFiClientSecure secureClient;
+  secureClient.setInsecure(); // For testing - in production will use proper certificates
+  
+  http.begin(secureClient, serverURL);
+  
+  // headers 
+  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+  http.addHeader("User-Agent", "ESP8266-DHT-Logger/2.0-HighFreq");
+  
+  http.setTimeout(15000); // 15 second timeout
+  http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+  
+  int httpResponseCode = http.POST(payload);
+  
+  if (httpResponseCode > 0) {
+    String response = http.getString();
     
-    // FIXED: Change Content-Type to form data instead of JSON
-    http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-    http.addHeader("User-Agent", "ESP8266-DHT22-Logger");
-    
-    // REMOVED: Authorization header since we're using form parameter for secret
-    http.setTimeout(10000); // Increased timeout to 10 seconds
-    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS); // Handle 301 redirects
-    
-    int httpResponseCode = http.POST(payload);
-    
-    if (httpResponseCode > 0) {
-      String response = http.getString();
+    // Only show detailed response for errors or first few transmissions
+    if (httpResponseCode != 200 || totalTransmissions <= 5) {
       Serial.print("HTTP Response Code: ");
       Serial.println(httpResponseCode);
-      
-      // Handle different response codes
-      if (httpResponseCode == 301 || httpResponseCode == 302) {
-        Serial.println("⚠️  SERVER REDIRECT DETECTED!");
-        Serial.println("Fix your serverURL - check for:");
-        Serial.println("1. Missing trailing slash");
-        Serial.println("2. HTTP vs HTTPS");
-        Serial.println("3. Correct path/domain");
-        
-        // Print all headers for debugging
-        Serial.println("All response headers:");
-        for (int i = 0; i < http.headers(); i++) {
-          Serial.printf("Header %d: %s = %s\n", i, http.headerName(i).c_str(), http.header(i).c_str());
-        }
-        
-        String location = http.header("Location");
-        if (location.length() > 0) {
-          Serial.print("Redirect to: ");
-          Serial.println(location);
-        } else {
-          Serial.println("No Location header found in redirect response");
-        }
-        
-        // Try alternative URLs
-        Serial.println("\nSuggested URLs to try:");
-        Serial.println("1. https://lostdevs.io/uploader.php/");
-        Serial.println("2. https://www.lostdevs.io/uploader.php");
-        Serial.println("3. https://www.lostdevs.io/uploader.php/");
-        Serial.println("4. http://lostdevs.io/uploader.php");
-        Serial.println("5. http://lostdevs.io/uploader.php/");
-      }
-      
-      Serial.print("Server Response: ");
+      Serial.print("Response: ");
       Serial.println(response);
-      
-      http.end();
-      return (httpResponseCode >= 200 && httpResponseCode < 300); // Success codes 2xx
-    } else {
-      Serial.print("HTTP Error: ");
-      Serial.println(httpResponseCode);
-      Serial.println("Connection failed - check server URL and network");
-      http.end();
-      return false;
     }
+    
+    // Handle different response codes
+    if (httpResponseCode == 301 || httpResponseCode == 302) {
+      Serial.println("⚠️  REDIRECT DETECTED!");
+      String location = http.header("Location");
+      if (location.length() > 0) {
+        Serial.print("Redirect to: ");
+        Serial.println(location);
+      }
+    }
+    
+    http.end();
+    return (httpResponseCode >= 200 && httpResponseCode < 300);
+    
   } else {
-    Serial.println("WiFi not connected. Cannot send data.");
+    Serial.print("HTTP Error Code: ");
+    Serial.println(httpResponseCode);
+    
+    // Detailed error reporting
+    switch(httpResponseCode) {
+      case HTTPC_ERROR_CONNECTION_REFUSED:
+        Serial.println("Connection refused");
+        break;
+      case HTTPC_ERROR_SEND_HEADER_FAILED:
+        Serial.println("Send header failed");
+        break;
+      case HTTPC_ERROR_SEND_PAYLOAD_FAILED:
+        Serial.println("Send payload failed");
+        break;
+      case HTTPC_ERROR_NOT_CONNECTED:
+        Serial.println("Not connected");
+        break;
+      case HTTPC_ERROR_CONNECTION_LOST:
+        Serial.println("Connection lost");
+        break;
+      case HTTPC_ERROR_NO_STREAM:
+        Serial.println("No stream");
+        break;
+      case HTTPC_ERROR_NO_HTTP_SERVER:
+        Serial.println("No HTTP server");
+        break;
+      case HTTPC_ERROR_TOO_LESS_RAM:
+        Serial.println("Too less RAM");
+        break;
+      case HTTPC_ERROR_ENCODING:
+        Serial.println("Encoding error");
+        break;
+      case HTTPC_ERROR_STREAM_WRITE:
+        Serial.println("Stream write error");
+        break;
+      case HTTPC_ERROR_READ_TIMEOUT:
+        Serial.println("Read timeout");
+        break;
+      default:
+        Serial.println("Unknown error");
+        break;
+    }
+    
+    http.end();
     return false;
   }
 }
