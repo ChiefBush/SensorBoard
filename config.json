@@ -1,0 +1,32 @@
+// =============================================================================
+// config.json - Runtime Configuration File
+// =============================================================================
+/*
+{
+  "transmission": {
+    "interval": 5000,
+    "server_url": "https://lostdevs.io/ctrl1/master.php",
+    "timeout": 15000,
+    "retry_attempts": 3,
+    "batch_size": 1
+  },
+  "buffer": {
+    "max_size": 50,
+    "cache_duration": 300000,
+    "cleanup_interval": 60000,
+    "emergency_flush": true
+  },
+  "security": {
+    "secret_key": "lostdev-sensor1-1008200303082003",
+    "enable_encryption": false,
+    "signature_algorithm": "HMAC-SHA256",
+    "timestamp_validation": true
+  },
+  "monitoring": {
+    "metrics_interval": 30000,
+    "log_level": "INFO",
+    "performance_tracking": true,
+    "error_reporting": true
+  }
+}
+*/
