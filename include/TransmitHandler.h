@@ -34,6 +34,8 @@ public:
   TransmitHandler();
   
   bool initialize(const NetworkConfig& networkConfig);
+  // Build form-encoded payload (no security/crypto)
+  String buildFormPayload(const SensorReading& reading, const ConfigManager& config, unsigned long dataAge, int readingAge);
   bool sendData(const String& payload);
   NetworkMetrics getMetrics() const { return metrics; }
   bool isHealthy() const;

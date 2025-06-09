@@ -46,6 +46,7 @@ struct NetworkConfig {
   unsigned long timeout;
   int retryAttempts;
   int batchSize;
+  WiFiConfig wifiConfig;
 };
 
 struct BufferConfig {

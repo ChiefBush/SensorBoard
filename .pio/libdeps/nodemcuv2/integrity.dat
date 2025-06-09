@@ -1,0 +1,10 @@
+arduino-libraries/NTPClient @ ^3.2.1
+rweather/Crypto @ ^0.4.0
+adafruit/DHT sensor library @ ^1.4.4
+ESP8266WiFi
+rweather/SHA256 @ ^0.0.0
+WiFiClientSecure
+bblanchon/ArduinoJson @ ^6.21.3
+rweather/AES @ ^0.0.0
+rweather/CBC @ ^0.0.0
+ESP8266HTTPClient
