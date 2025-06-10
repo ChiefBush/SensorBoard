@@ -1,0 +1,25 @@
+Free Heap: 19336
+End of loop.
+Starting loop...
+Free Heap: 19336
+End of loop.
+Starting loop...
+Free Heap: 19336
+End of loop.
+Starting loop...
+Free Heap: 19336
+End of loop.
+Starting loop...
+Free Heap: 19336
+End of loop.
+Starting loop...
+Free Heap: 19336
+End of loop.
+Starting loop...
+Free Heap: 19336
+End of loop.
+Starting loop...
+ 
+
+1. It is sending wrong time stamp, 
+2. The serial output is not Giving checkpoints but rather a loop that floods the serial output 

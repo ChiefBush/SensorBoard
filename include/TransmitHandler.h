@@ -9,6 +9,7 @@
 #include <ESP8266HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include "ConfigManager.h"
+#include "SensorModel.h"
 
 struct NetworkMetrics {
   unsigned long totalRequests;

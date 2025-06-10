@@ -8,6 +8,13 @@
 // #include <CBC.h>
 #include <ArduinoJson.h>
 
+// Comment out AES and CBC related code
+// AES128 aes128;
+// CBC<AES128> cbc(aes128);
+
+// Comment out SHA256 related code
+// SHA256 sha256;
+
 SecurityLogic::SecurityLogic() : encryptionEnabled(false) {}
 
 bool SecurityLogic::initialize(const String& key) {
@@ -86,8 +93,8 @@ String SecurityLogic::encryptData(const String& data) {
   }
   
   // Initialize AES
-  AES128 aes128;
-  CBC<AES128> cbc(aes128);
+  // AES128 aes128;
+  // CBC<AES128> cbc(aes128);
   
   // Pad data to 16-byte blocks
   int dataLen = data.length();
@@ -98,9 +105,9 @@ String SecurityLogic::encryptData(const String& data) {
   
   // Encrypt
   byte encrypted[paddedLen];
-  cbc.setKey(key, 32);
-  cbc.setIV(iv, 16);
-  cbc.encrypt(encrypted, paddedData, paddedLen);
+  // cbc.setKey(key, 32);
+  // cbc.setIV(iv, 16);
+  // cbc.encrypt(encrypted, paddedData, paddedLen);
   
   // Combine IV and encrypted data
   String result;
@@ -155,14 +162,14 @@ String SecurityLogic::decryptData(const String& encryptedData) {
   }
   
   // Initialize AES
-  AES128 aes128;
-  CBC<AES128> cbc(aes128);
+  // AES128 aes128;
+  // CBC<AES128> cbc(aes128);
   
   // Decrypt
   byte decrypted[encryptedLen];
-  cbc.setKey(key, 32);
-  cbc.setIV(iv, 16);
-  cbc.decrypt(decrypted, encrypted, encryptedLen);
+  // cbc.setKey(key, 32);
+  // cbc.setIV(iv, 16);
+  // cbc.decrypt(decrypted, encrypted, encryptedLen);
   
   // Convert to string and remove padding
   String result;
@@ -177,7 +184,7 @@ String SecurityLogic::decryptData(const String& encryptedData) {
 }
 
 String SecurityLogic::generateHMAC(const String& data) {
-  SHA256 sha256;
+  // SHA256 sha256;
   byte hmacResult[32];
   
   // Convert secret key to byte array
@@ -187,9 +194,9 @@ String SecurityLogic::generateHMAC(const String& data) {
   }
   
   // Calculate HMAC
-  sha256.resetHMAC(key, 32);
-  sha256.update(data.c_str(), data.length());
-  sha256.finalizeHMAC(key, 32, hmacResult, 32);
+  // sha256.resetHMAC(key, 32);
+  // sha256.update(data.c_str(), data.length());
+  // sha256.finalizeHMAC(key, 32, hmacResult, 32);
   
   // Convert to hex string
   String result;

@@ -9,6 +9,7 @@
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 #include "./include/BufferLogic.h"
+#include <time.h>
 
 // WiFi credentials
 const char* ssid = "KRC-101C";
@@ -43,36 +44,60 @@ HTTPClient http;
 
 void setup() {
   Serial.begin(115200);
+  Serial.println("Starting setup...");
+  Serial.printf("Free Heap: %d\n", ESP.getFreeHeap());
   dht.begin();
   WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) { delay(500); Serial.print("."); }
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
   Serial.println("\nConnected to WiFi");
   timeClient.begin();
   timeClient.setTimeOffset(19800);
   BufferConfig config;
   bufferLogic.initialize(config);
+  configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+  Serial.print("Waiting for NTP time sync...");
+  time_t now = time(nullptr);
+  while (now < 8 * 3600 * 2) {
+    delay(500);
+    Serial.print(".");
+    now = time(nullptr);
+  }
+  Serial.println(" done!");
   Serial.println("\nSetup complete. Starting 30s interval transmission with buffer.");
 }
 
 void loop() {
-  unsigned long currentTime = millis();
-
-  // Read sensor data every 3 seconds
-  if (currentTime - lastSensorReading >= sensorReadInterval) {
+  static unsigned long lastPrint = 0;
+  if (millis() - lastPrint > 5000) { // Print every 5 seconds
+    Serial.print("Free Heap: ");
+    Serial.println(ESP.getFreeHeap());
+    lastPrint = millis();
+  }
+  Serial.println("Starting loop...");
+  timeClient.update();
+  unsigned long currentMillis = millis();
+  if (currentMillis - lastSensorReading >= sensorReadInterval) {
+    Serial.println("Reading sensor...");
     float t = dht.readTemperature();
     float h = dht.readHumidity();
     if (!isnan(t) && !isnan(h)) {
-      SensorReading reading = {t, h, true, timeClient.getEpochTime()};
+      SensorReading reading;
+      reading.temperature = t;
+      reading.humidity = h;
+      reading.isValid = true;
+      reading.timestamp = timeClient.getEpochTime();
       bufferLogic.addReading(reading);
       Serial.printf("New reading: %.1f°C, %.1f%%\n", t, h);
     } else {
-      Serial.println("Sensor read failed. Skipping buffer update.");
+      Serial.println("Failed to read from DHT sensor!");
     }
-    lastSensorReading = currentTime;
+    lastSensorReading = currentMillis;
   }
-
-  // Transmit data every 30 seconds
-  if (currentTime - lastDataTransmission >= transmissionInterval) {
+  if (currentMillis - lastDataTransmission >= transmissionInterval) {
+    Serial.println("Transmitting data...");
     SensorReading dataToSend = bufferLogic.getDataForTransmission();
     if (dataToSend.isValid) {
       String payload = "";
@@ -93,9 +118,12 @@ void loop() {
       Serial.printf("HTTP POST code: %d\n", httpResponseCode);
       http.end();
     } else {
-      Serial.println("No valid data in buffer. Skipping transmission.");
+      Serial.println("No valid data to transmit.");
     }
-    lastDataTransmission = currentTime;
+    lastDataTransmission = currentMillis;
   }
-  delay(50);
+  time_t now = time(nullptr);
+  Serial.print("Current timestamp: ");
+  Serial.println(now);
+  Serial.println("End of loop.");
 } 

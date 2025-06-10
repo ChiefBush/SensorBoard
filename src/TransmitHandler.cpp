@@ -74,11 +74,11 @@ bool TransmitHandler::sendData(const String& payload) {
     metrics.successfulRequests++;
     String response = http.getString();
     Serial.printf("📤 Transmission #%lu: SUCCESS (%.1fms)\n", metrics.totalRequests, (float)responseTime);
-    Serial.printf("Response: %s\n", response.c_str());
+      Serial.printf("Response: %s\n", response.c_str());
   } else {
     metrics.failedRequests++;
     Serial.printf("❌ Transmission #%lu: FAILED (HTTP %d)\n", metrics.totalRequests, httpCode);
-  }
+    }
   http.end();
   return success;
 }

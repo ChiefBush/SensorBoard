@@ -9,6 +9,9 @@
 #include "SensorModel.h"
 #include "ConfigManager.h"
 
+// Define maximum buffer size to prevent excessive memory usage
+#define MAX_BUFFER_SIZE 50
+
 struct BufferMetadata {
   unsigned long totalTransmissions;
   unsigned long successfulTransmissions;
@@ -22,7 +25,9 @@ struct BufferMetadata {
 
 class BufferLogic {
 private:
-  std::vector<SensorReading> buffer;
+  // Use static array instead of vector to avoid dynamic memory allocation
+  static SensorReading buffer[MAX_BUFFER_SIZE];
+  static int bufferIndex;
   BufferConfig config;
   BufferMetadata metadata;
   SensorReading cachedReading;
@@ -41,7 +46,7 @@ public:
   
   BufferMetadata getMetadata() const { return metadata; }
   unsigned long getTotalTransmissions() const { return metadata.totalTransmissions; }
-  int getBufferSize() const { return buffer.size(); }
+  int getBufferSize() const { return bufferIndex; }
   
   void flushBuffer();
   void printBufferStatus();

@@ -4,6 +4,10 @@
 // =============================================================================
 #include "../include/BufferLogic.h"
 
+// Initialize static members
+SensorReading BufferLogic::buffer[MAX_BUFFER_SIZE];
+int BufferLogic::bufferIndex = 0;
+
 BufferLogic::BufferLogic() : transmissionAge(0) {
   metadata.totalTransmissions = 0;
   metadata.successfulTransmissions = 0;
@@ -17,22 +21,33 @@ BufferLogic::BufferLogic() : transmissionAge(0) {
 
 void BufferLogic::initialize(const BufferConfig& bufferConfig) {
   config = bufferConfig;
-  buffer.reserve(config.maxSize);
+  bufferIndex = 0; // Reset buffer index
   
   Serial.printf("-> Buffer initialized: max_size=%d, cache_duration=%lums\n", 
-                config.maxSize, config.cacheDuration);
+                MAX_BUFFER_SIZE, config.cacheDuration);
 }
 
 void BufferLogic::addReading(const SensorReading& reading) {
   if (reading.isValid) {
-    buffer.push_back(reading);
-    cachedReading = reading;
-    transmissionAge = 0; // Reset age counter for new reading
-    
-    maintainBufferSize();
-    cleanupOldEntries();
-    
-    metadata.currentBufferSize = buffer.size();
+    if (bufferIndex < MAX_BUFFER_SIZE) {
+      buffer[bufferIndex++] = reading;
+      cachedReading = reading;
+      transmissionAge = 0;
+      
+      maintainBufferSize();
+      cleanupOldEntries();
+      
+      metadata.currentBufferSize = bufferIndex;
+    } else {
+      Serial.println("Buffer full, dropping oldest reading");
+      // Shift buffer and add new reading
+      for (int i = 0; i < MAX_BUFFER_SIZE - 1; i++) {
+        buffer[i] = buffer[i + 1];
+      }
+      buffer[MAX_BUFFER_SIZE - 1] = reading;
+      cachedReading = reading;
+      transmissionAge = 0;
+    }
   }
 }
 
@@ -43,9 +58,9 @@ SensorReading BufferLogic::getDataForTransmission() {
     transmissionAge++;
     
     if (transmissionAge == 1) {
-      metadata.cacheMisses++; // Fresh data
+      metadata.cacheMisses++;
     } else {
-      metadata.cacheHits++; // Cached data
+      metadata.cacheHits++;
     }
   }
   
@@ -66,19 +81,37 @@ void BufferLogic::recordTransmissionResult(bool success) {
 
 void BufferLogic::cleanupOldEntries() {
   unsigned long currentTime = millis();
+  int newIndex = 0;
   
-  buffer.erase(
-    std::remove_if(buffer.begin(), buffer.end(),
-      [this, currentTime](const SensorReading& reading) {
-        return (currentTime - reading.timestamp * 1000) > config.cacheDuration;
-      }),
-    buffer.end()
-  );
+  for (int i = 0; i < bufferIndex; i++) {
+    if ((currentTime - buffer[i].timestamp * 1000) <= config.cacheDuration) {
+      if (newIndex != i) {
+        buffer[newIndex] = buffer[i];
+      }
+      newIndex++;
+    }
+  }
+  
+  bufferIndex = newIndex;
 }
 
 void BufferLogic::maintainBufferSize() {
-  if (buffer.size() > config.maxSize) {
-    int excess = buffer.size() - config.maxSize;
-    buffer.erase(buffer.begin(), buffer.begin() + excess);
+  if (bufferIndex > config.maxSize) {
+    int excess = bufferIndex - config.maxSize;
+    for (int i = 0; i < bufferIndex - excess; i++) {
+      buffer[i] = buffer[i + excess];
+    }
+    bufferIndex -= excess;
   }
+}
+
+void BufferLogic::flushBuffer() {
+  bufferIndex = 0;
+  metadata.currentBufferSize = 0;
+}
+
+void BufferLogic::printBufferStatus() {
+  Serial.printf("Buffer Status: %d/%d entries\n", bufferIndex, MAX_BUFFER_SIZE);
+  Serial.printf("Cache hits: %lu, misses: %lu\n", metadata.cacheHits, metadata.cacheMisses);
+  Serial.printf("Success rate: %.1f%%\n", metadata.successRate);
 }
