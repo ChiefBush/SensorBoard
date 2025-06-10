@@ -20,7 +20,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include "BlockCipher.h"
+#include "../BlockCipher.h"
 
 /**
  * \class BlockCipher BlockCipher.h <BlockCipher.h>

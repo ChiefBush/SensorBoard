@@ -20,9 +20,9 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include "ChaChaPoly.h"
-#include "Crypto.h"
-#include "utility/EndianUtil.h"
+#include "../ChaChaPoly.h"
+#include "../Crypto.h"
+#include "../utility/EndianUtil.h"
 #include <string.h>
 
 /**

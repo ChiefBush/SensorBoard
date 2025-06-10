@@ -12,7 +12,7 @@
  *  please support Adafruit andopen-source hardware by purchasing products
  *  from Adafruit!
  */
-#include "DHT_U.h"
+#include "../DHT_U.h"
 
 /*!
  *  @brief  Instantiates a new DHT_Unified class

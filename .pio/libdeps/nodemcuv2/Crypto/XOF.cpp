@@ -20,7 +20,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include "XOF.h"
+#include "../XOF.h"
 
 /**
  * \class XOF XOF.h <XOF.h>

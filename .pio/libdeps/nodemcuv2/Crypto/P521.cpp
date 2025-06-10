@@ -20,11 +20,11 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include "P521.h"
-#include "Crypto.h"
-#include "RNG.h"
-#include "SHA512.h"
-#include "utility/LimbUtil.h"
+#include "../P521.h"
+#include "../Crypto.h"
+#include "../RNG.h"
+#include "../SHA512.h"
+#include "../utility/LimbUtil.h"
 #include <string.h>
 
 /**

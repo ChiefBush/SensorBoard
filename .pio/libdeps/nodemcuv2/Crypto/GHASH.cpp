@@ -20,9 +20,9 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include "GHASH.h"
-#include "GF128.h"
-#include "Crypto.h"
+#include "../GHASH.h"
+#include "../GF128.h"
+#include "../Crypto.h"
 #include <string.h>
 
 /**

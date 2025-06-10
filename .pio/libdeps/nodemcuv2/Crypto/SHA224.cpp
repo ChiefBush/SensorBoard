@@ -20,8 +20,8 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include "SHA224.h"
-#include "Crypto.h"
+#include "../SHA224.h"
+#include "../Crypto.h"
 
 /**
  * \class SHA224 SHA224.h <SHA224.h>

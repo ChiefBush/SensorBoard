@@ -20,8 +20,8 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include "AES.h"
-#include "Crypto.h"
+#include "../AES.h"
+#include "../Crypto.h"
 #include <string.h>
 
 #if defined(CRYPTO_AES_DEFAULT) || defined(CRYPTO_DOC)

@@ -20,10 +20,10 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include "Curve25519.h"
-#include "Crypto.h"
-#include "RNG.h"
-#include "utility/LimbUtil.h"
+#include "../Curve25519.h"
+#include "../Crypto.h"
+#include "../RNG.h"
+#include "../utility/LimbUtil.h"
 #include <string.h>
 
 /**

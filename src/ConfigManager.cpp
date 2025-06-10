@@ -1,7 +1,7 @@
 // =============================================================================
 // ConfigManager.cpp - Configuration Management Implementation
 // =============================================================================
-#include "ConfigManager.h"
+#include "../include/ConfigManager.h"
 
 bool ConfigManager::initialize() {
   Serial.println("🔧 Initializing Configuration Manager...");

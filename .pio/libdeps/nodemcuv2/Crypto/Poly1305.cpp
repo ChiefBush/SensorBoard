@@ -20,10 +20,10 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include "Poly1305.h"
-#include "Crypto.h"
-#include "utility/EndianUtil.h"
-#include "utility/LimbUtil.h"
+#include "../Poly1305.h"
+#include "../Crypto.h"
+#include "../utility/EndianUtil.h"
+#include "../utility/LimbUtil.h"
 #include <string.h>
 
 /**

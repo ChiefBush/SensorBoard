@@ -20,7 +20,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include "Hash.h"
+#include "../Hash.h"
 #include <string.h>
 
 /**

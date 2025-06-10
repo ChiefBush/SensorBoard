@@ -1,7 +1,7 @@
 // =============================================================================
 // SensorModel.cpp - Sensor Management Implementation
 // =============================================================================
-#include "SensorModel.h"
+#include "../include/SensorModel.h"
 
 SensorModel::SensorModel() : dht(nullptr), nextReadingId(1) {
   metrics.totalReadings = 0;

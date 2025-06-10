@@ -20,7 +20,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include "Crypto.h"
+#include "../Crypto.h"
 
 /**
  * \brief Cleans a block of bytes.

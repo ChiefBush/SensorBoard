@@ -20,9 +20,9 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include "OMAC.h"
-#include "GF128.h"
-#include "Crypto.h"
+#include "../OMAC.h"
+#include "../GF128.h"
+#include "../Crypto.h"
 #include <string.h>
 
 /**

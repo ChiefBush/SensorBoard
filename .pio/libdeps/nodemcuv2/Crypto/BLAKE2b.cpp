@@ -20,11 +20,11 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include "BLAKE2b.h"
-#include "Crypto.h"
-#include "utility/EndianUtil.h"
-#include "utility/RotateUtil.h"
-#include "utility/ProgMemUtil.h"
+#include "../BLAKE2b.h"
+#include "../Crypto.h"
+#include "../utility/EndianUtil.h"
+#include "../utility/RotateUtil.h"
+#include "../utility/ProgMemUtil.h"
 #include <string.h>
 
 /**

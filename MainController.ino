@@ -2,12 +2,16 @@
 // MainController.ino - Main Arduino Sketch
 // =============================================================================
 
-#include "ConfigManager.h"
-#include "SensorModel.h"
-#include "BufferLogic.h"
-#include "TransmitHandler.h"
-#include "SecurityLogic.h"
-#include "JSONView.h"
+#include <Arduino.h>
+#include <ESP8266WiFi.h>
+#include <ESP8266HTTPClient.h>
+#include <WiFiClientSecure.h>
+#include "./include/ConfigManager.h"
+#include "./include/SensorModel.h"
+#include "./include/BufferLogic.h"
+#include "./include/TransmitHandler.h"
+#include "./include/SecurityLogic.h"
+#include "./include/JSONView.h"
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 
@@ -40,6 +44,11 @@ void setup() {
     ESP.restart();
   }
   
+  // Initialize WiFi
+  WiFi.mode(WIFI_STA);
+  WiFi.setAutoReconnect(true);
+  WiFi.persistent(true);
+  
   // Initialize security layer
   if (!securityLogic.initialize(configManager.getSecretKey())) {
     Serial.println("!-! Security initialization failed!");
@@ -54,14 +63,17 @@ void setup() {
   // Initialize buffer system
   bufferLogic.initialize(configManager.getBufferConfig());
   
-  // Initialize transmission handler
-  if (!transmitHandler.initialize(configManager.getNetworkConfig())) {
+  // Initialize transmission handler with WiFi config
+  NetworkConfig networkConfig = configManager.getNetworkConfig();
+  networkConfig.wifiConfig = configManager.getWiFiConfig();  // Set WiFi config
+  if (!transmitHandler.initialize(networkConfig)) {
     Serial.println("!-! Network initialization failed!");
     ESP.restart();
   }
   
   // Initialize NTP client
-  initializeNTP();
+  timeClient.begin();
+  timeClient.setTimeOffset(19800); // IST offset
   
   Serial.println("-> All systems initialized successfully!");
   Serial.println("System Configuration:");

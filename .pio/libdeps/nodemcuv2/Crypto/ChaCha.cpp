@@ -20,11 +20,11 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include "ChaCha.h"
-#include "Crypto.h"
-#include "utility/RotateUtil.h"
-#include "utility/EndianUtil.h"
-#include "utility/ProgMemUtil.h"
+#include "../ChaCha.h"
+#include "../Crypto.h"
+#include "../utility/RotateUtil.h"
+#include "../utility/EndianUtil.h"
+#include "../utility/ProgMemUtil.h"
 #include <string.h>
 
 /**

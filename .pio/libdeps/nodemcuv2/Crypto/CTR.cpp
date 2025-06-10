@@ -20,8 +20,8 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include "CTR.h"
-#include "Crypto.h"
+#include "../CTR.h"
+#include "../Crypto.h"
 #include <string.h>
 
 /**

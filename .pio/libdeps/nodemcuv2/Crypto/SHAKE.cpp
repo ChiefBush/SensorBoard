@@ -20,7 +20,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include "SHAKE.h"
+#include "../SHAKE.h"
 
 /**
  * \class SHAKE SHAKE.h <SHAKE.h>

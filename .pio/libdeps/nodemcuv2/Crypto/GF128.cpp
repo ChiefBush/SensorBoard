@@ -20,8 +20,8 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include "GF128.h"
-#include "utility/EndianUtil.h"
+#include "../GF128.h"
+#include "../utility/EndianUtil.h"
 #include <string.h>
 
 /**

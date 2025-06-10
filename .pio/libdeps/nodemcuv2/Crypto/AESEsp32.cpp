@@ -20,8 +20,8 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include "AES.h"
-#include "Crypto.h"
+#include "../AES.h"
+#include "../Crypto.h"
 #include <string.h>
 
 // AES implementation for ESP32 using the hardware crypto module.

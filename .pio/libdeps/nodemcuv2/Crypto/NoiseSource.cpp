@@ -20,8 +20,8 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include "NoiseSource.h"
-#include "RNG.h"
+#include "../NoiseSource.h"
+#include "../RNG.h"
 
 /**
  * \class NoiseSource NoiseSource.h <NoiseSource.h>

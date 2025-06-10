@@ -20,9 +20,9 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include "XTS.h"
-#include "Crypto.h"
-#include "GF128.h"
+#include "../XTS.h"
+#include "../Crypto.h"
+#include "../GF128.h"
 #include <string.h>
 
 /**

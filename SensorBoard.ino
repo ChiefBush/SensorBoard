@@ -46,9 +46,11 @@ void setup() {
   dht.begin();
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) { delay(500); Serial.print("."); }
+  Serial.println("\nConnected to WiFi");
   timeClient.begin();
   timeClient.setTimeOffset(19800);
-  bufferLogic.initialize();
+  BufferConfig config;
+  bufferLogic.initialize(config);
   Serial.println("\nSetup complete. Starting 30s interval transmission with buffer.");
 }
 

@@ -20,11 +20,11 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include "SHA256.h"
-#include "Crypto.h"
-#include "utility/RotateUtil.h"
-#include "utility/EndianUtil.h"
-#include "utility/ProgMemUtil.h"
+#include "../SHA256.h"
+#include "../Crypto.h"
+#include "../utility/RotateUtil.h"
+#include "../utility/EndianUtil.h"
+#include "../utility/ProgMemUtil.h"
 #include <string.h>
 
 /**

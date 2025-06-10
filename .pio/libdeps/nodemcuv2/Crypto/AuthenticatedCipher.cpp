@@ -20,7 +20,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include "AuthenticatedCipher.h"
+#include "../AuthenticatedCipher.h"
 
 /**
  * \class AuthenticatedCipher AuthenticatedCipher.h <AuthenticatedCipher.h>
