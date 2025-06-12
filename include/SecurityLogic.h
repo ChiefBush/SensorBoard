@@ -8,20 +8,12 @@
 
 class SecurityLogic {
 private:
-  String secretKey;
-  bool encryptionEnabled;
-  
-  String generateHMAC(const String& data);
-  String generateTimestamp();
+    String deviceId;
 
 public:
-  SecurityLogic();
-  
-  bool initialize(const String& key);
-  String signPayload(const String& payload);
-  bool validateSignature(const String& payload, const String& signature);
-  String encryptData(const String& data);
-  String decryptData(const String& encryptedData);
+    SecurityLogic();
+    void initialize(const String& deviceId);
+    String signPayload(const String& payload);
 };
 
 #endif

@@ -10,10 +10,17 @@
 #include <WiFiUdp.h>
 #include "./include/BufferLogic.h"
 #include <time.h>
+#include <WiFiClient.h>
+#include <ArduinoJson.h>
+#include "./include/ConfigManager.h"
+#include "./include/SensorModel.h"
+#include "./include/TransmitHandler.h"
+#include "./include/JSONView.h"
+#include "GPSHandler.h"
 
 // WiFi credentials
-const char* ssid = "KRC-101C";
-const char* password = "krc101c@";
+const char* ssid = "SidOmi";
+const char* password = "28102003Omi";
 
 // Server configuration
 const char* serverURL = "https://lostdevs.io/ctrl1/master.php";
@@ -34,39 +41,109 @@ const float LONGITUDE = 77.170277;
 
 unsigned long lastSensorReading = 0;
 unsigned long lastDataTransmission = 0;
-const unsigned long sensorReadInterval = 3000;    // Read DHT11 every 3 seconds
-const unsigned long transmissionInterval = 30000; // Send data every 30 seconds
-
-BufferLogic bufferLogic;
+const unsigned long sensorReadInterval = 10000;    // Read DHT11 every 10 seconds
+const unsigned long transmissionInterval = 60000;   // Send data every 60 seconds
 
 WiFiClientSecure secureClient;
 HTTPClient http;
 
+ConfigManager config;
+SensorModel sensor;
+BufferLogic bufferLogic;
+TransmitHandler transmitter;
+JSONView jsonView;
+
+GPSHandler gpsHandler;
+
 void setup() {
   Serial.begin(115200);
-  Serial.println("Starting setup...");
-  Serial.printf("Free Heap: %d\n", ESP.getFreeHeap());
-  dht.begin();
+  Serial.println("\nStarting up...");
+  
+  // Initialize WiFi
+  WiFi.mode(WIFI_STA);  // Set WiFi to station mode
+  WiFi.disconnect();    // Disconnect from any previous connection
+  delay(1000);         // Give some time to disconnect
+  
+  Serial.print("Connecting to WiFi network: ");
+  Serial.println(ssid);
+  Serial.print("Signal strength: ");
+  Serial.println(WiFi.RSSI());
+  
   WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
+  
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
     delay(500);
     Serial.print(".");
+    attempts++;
+    
+    // Print connection status
+    switch(WiFi.status()) {
+      case WL_IDLE_STATUS:
+        Serial.print("\nStatus: Idle");
+        break;
+      case WL_NO_SSID_AVAIL:
+        Serial.print("\nStatus: SSID not found");
+        break;
+      case WL_CONNECT_FAILED:
+        Serial.print("\nStatus: Connection failed");
+        break;
+      case WL_CONNECTION_LOST:
+        Serial.print("\nStatus: Connection lost");
+        break;
+      case WL_DISCONNECTED:
+        Serial.print("\nStatus: Disconnected");
+        break;
+    }
   }
-  Serial.println("\nConnected to WiFi");
+  
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\nWiFi connected!");
+    Serial.print("IP address: ");
+    Serial.println(WiFi.localIP());
+    Serial.print("Signal strength: ");
+    Serial.println(WiFi.RSSI());
+  } else {
+    Serial.println("\nFailed to connect to WiFi!");
+    Serial.println("Please check:");
+    Serial.println("1. WiFi network is in range");
+    Serial.println("2. SSID and password are correct");
+    Serial.println("3. Network is 2.4GHz (not 5GHz)");
+    Serial.println("4. Network allows new connections");
+    // Continue anyway to see if we can get time sync
+  }
+  
+  // Initialize time
+  configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+  Serial.println("Waiting for time sync...");
+  while (time(nullptr) < 1000000000) {
+    delay(100);
+    Serial.print(".");
+  }
+  Serial.println("\nTime synchronized!");
+  
+  // Initialize components with their configurations
+  SensorConfig sensorConfig;
+  sensorConfig.pin = DHT_PIN;
+  sensorConfig.type = DHT_TYPE;
+  sensor.initialize(sensorConfig);
+  
+  BufferConfig bufferConfig;
+  bufferConfig.maxSize = 100;  // Maximum number of readings to store
+  bufferLogic.initialize(bufferConfig);
+  
+  transmitter.initialize(config.getNetworkConfig());
+  
+  // Print initial status
+  jsonView.printSystemStatus(config, sensor, bufferLogic);
+
+  dht.begin();
   timeClient.begin();
   timeClient.setTimeOffset(19800);
-  BufferConfig config;
-  bufferLogic.initialize(config);
-  configTime(0, 0, "pool.ntp.org", "time.nist.gov");
-  Serial.print("Waiting for NTP time sync...");
-  time_t now = time(nullptr);
-  while (now < 8 * 3600 * 2) {
-    delay(500);
-    Serial.print(".");
-    now = time(nullptr);
-  }
-  Serial.println(" done!");
-  Serial.println("\nSetup complete. Starting 30s interval transmission with buffer.");
+  Serial.println("\nSetup complete. Starting 60s interval transmission with buffer.");
+
+  // Initialize GPS
+  gpsHandler.begin();
 }
 
 void loop() {
