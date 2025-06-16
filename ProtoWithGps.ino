@@ -262,7 +262,7 @@ void readGPSData() {
   bool newData = false;
   unsigned long gpsStart = millis();
   
-  // Read GPS for up to 2 seconds (increased)
+  // Read GPS for up to 2 seconds
   while (millis() - gpsStart < 2000) {
     if (gpsSerial.available()) {
       if (gps.encode(gpsSerial.read())) {
@@ -273,6 +273,7 @@ void readGPSData() {
   }
   
   if (newData && gps.location.isValid()) {
+    // Always update GPS coordinates on every valid reading
     gpsData.latitude = gps.location.lat();
     gpsData.longitude = gps.location.lng();
     gpsData.isValid = true;
@@ -280,17 +281,10 @@ void readGPSData() {
     gpsData.satellites = gps.satellites.value();
     gpsData.hdop = gps.hdop.hdop();
     
-    // Only print GPS updates when location changes significantly or first valid fix
-    static float lastLat = 0, lastLng = 0;
-    float latDiff = abs(gpsData.latitude - lastLat);
-    float lngDiff = abs(gpsData.longitude - lastLng);
+    // Always print GPS updates to show real-time coordinates
+    Serial.printf("🛰️  GPS: %.6f, %.6f (Sats: %d, HDOP: %.2f)\n", 
+                  gpsData.latitude, gpsData.longitude, gpsData.satellites, gpsData.hdop);
     
-    if (latDiff > 0.0001 || lngDiff > 0.0001 || lastLat == 0) {
-      Serial.printf("🛰️  GPS: %.6f, %.6f (Sats: %d, HDOP: %.2f)\n", 
-                    gpsData.latitude, gpsData.longitude, gpsData.satellites, gpsData.hdop);
-      lastLat = gpsData.latitude;
-      lastLng = gpsData.longitude;
-    }
   } else {
     if (!gpsData.isValid) {
       gpsFailures++;
