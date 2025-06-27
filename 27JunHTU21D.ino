@@ -47,7 +47,15 @@ TinyGPSPlus gps;
 
 // NTP Client - using Google's time servers with IST offset
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "time.google.com", 19800, 60000); // IST = UTC + 5:30 (19800 seconds)
+NTPClient timeClient(ntpUDP, "", 19800, 60000);  // Server set manually during init
+
+const char* ntpServers[] = {
+  "192.168.251.12",           // CSIR NTP Server (primary)
+  "time.cloudflare.com",      // Fallback 1
+  "time.google.com"           // Fallback 2
+};
+const int ntpServerCount = sizeof(ntpServers) / sizeof(ntpServers[0]);
+
 
 // BootConfig.h
 const int SENSOR_ID = 3;
@@ -639,27 +647,37 @@ void connectToWiFi() {
 
 void initializeNTP() {
   Serial.println("🕒 Initializing NTP...");
-  timeClient.begin();
-  
-  for (int attempt = 1; attempt <= 5; attempt++) {
-    Serial.printf("   NTP attempt %d/5...", attempt);
-    
-    if (timeClient.forceUpdate()) {
-      unsigned long epochTime = timeClient.getEpochTime();
-      if (epochTime > 1640995200) {
-        Serial.printf(" ✅ SUCCESS - IST Time: %s\n", timeClient.getFormattedTime().c_str());
-        ntpSynced = true;
-        return;
+
+  for (int i = 0; i < ntpServerCount; i++) {
+    const char* server = ntpServers[i];
+    Serial.printf("   Attempting NTP sync with %s...\n", server);
+
+    timeClient.setPoolServerName(server);
+    timeClient.begin();
+
+    for (int attempt = 1; attempt <= 3; attempt++) {
+      Serial.printf("      NTP try %d/3...", attempt);
+      if (timeClient.forceUpdate()) {
+        unsigned long epochTime = timeClient.getEpochTime();
+        if (epochTime > 1640995200) {
+          Serial.printf(" ✅ SUCCESS - Time: %s from %s\n", timeClient.getFormattedTime().c_str(), server);
+          ntpSynced = true;
+          return;
+        }
       }
+      Serial.println(" ❌ Failed");
+      delay(1000);
     }
-    
-    Serial.println(" ❌ Failed");
-    delay(2000);
+
+    timeClient.end();  // Clean up before next attempt
   }
-  
-  Serial.println("⚠️  NTP sync failed - will use system time");
+
+  Serial.println("⚠️  All NTP sync attempts failed. Using fallback system time.");
   ntpSynced = false;
 }
+
+  
+
 
 String getTimestamp() {
   if (ntpSynced) {
